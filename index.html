@@ -428,9 +428,56 @@
 
   /* Responsive */
   @media(max-width:600px){
-    header{padding:0 1rem}
-    main{padding:1rem 1rem 3rem}
+    header{padding:0 1rem;height:60px}
+    main{padding:.75rem .75rem 3rem}
     .header-title{display:none}
+    #clock{display:none}
+
+    /* Stats cards en 2 columnas en móvil */
+    .stats-grid{grid-template-columns:repeat(2,1fr);gap:.5rem}
+    .stat-value{font-size:1.5rem}
+
+    /* Chart section apilado */
+    .chart-section{flex-direction:column}
+    .ptl-legend-card{min-width:unset;width:100%}
+
+    /* Toolbar: columna en móvil */
+    .toolbar{flex-direction:column;align-items:stretch;gap:.5rem;padding:.75rem}
+    .search-wrap{min-width:unset}
+    .filter-btns{flex-wrap:wrap;gap:.35rem}
+    .filter-btn{font-size:.7rem;padding:.4rem .7rem}
+    .count-badge{margin-left:0;text-align:right}
+
+    /* Loaders en 1 columna */
+    .loaders-grid{grid-template-columns:1fr}
+
+    /* Hist strip apilado */
+    .hist-strip{flex-direction:column;align-items:flex-start;gap:.5rem}
+
+    /* Action row apilado */
+    .action-row{flex-direction:column;align-items:stretch}
+    .btn-cruzar{width:100%;justify-content:center}
+    .btn-upload{width:100%;justify-content:center;margin-top:.25rem}
+
+    /* Tabla: scroll horizontal con texto más pequeño */
+    .table-scroll{font-size:.72rem}
+    thead th{padding:.6rem .5rem;font-size:.6rem}
+    tbody td{padding:.5rem .5rem}
+
+    /* Paginación simplificada */
+    .pagination{flex-direction:column;gap:.4rem;text-align:center}
+
+    /* Login card más pequeño */
+    .login-card{padding:1.75rem 1.25rem}
+
+    /* Fecha cruce en móvil */
+    #fechaCruce{width:100%}
+  }
+
+  @media(max-width:400px){
+    .stats-grid{grid-template-columns:1fr 1fr}
+    .stat-value{font-size:1.3rem}
+    .filter-btn{font-size:.65rem;padding:.35rem .55rem}
   }
 
   /* ── LOGIN OVERLAY ───────────────────────────────────────── */
@@ -598,6 +645,18 @@
         title="Limpia los reportes cargados y el resultado del cruce de esta sesión. NO elimina el histórico de trazabilidad.">
         🔄 Nuevo cruce del día
       </button>
+      <!-- Selector de fecha para cargar días históricos faltantes -->
+      <div style="display:flex;align-items:center;gap:.4rem;flex-wrap:wrap">
+        <label for="fechaCruce" style="font-size:.73rem;font-weight:600;color:var(--gray-700);white-space:nowrap">
+          📅 Fecha del reporte:
+        </label>
+        <input type="date" id="fechaCruce"
+          style="padding:.38rem .6rem;border:1.5px solid var(--gray-200);border-radius:var(--radius-sm);
+                 font-family:inherit;font-size:.78rem;color:var(--gray-900);outline:none;
+                 transition:border-color .2s;background:var(--gray-50)"
+          title="Cambia esta fecha solo cuando estés cargando reportes de días anteriores. Para el día de hoy déjala en blanco o en la fecha actual.">
+        <button class="btn-sm" id="btnFechaHoy" title="Resetear a la fecha de hoy">Hoy</button>
+      </div>
     </div>
 
     <div class="upload-status" id="uploadStatus" style="display:none">
@@ -1822,7 +1881,10 @@ async function cruzarReportes(){
     await yield_();
 
     const records = [];
-    const today = new Date().toISOString().slice(0,10);
+    const fechaInput = document.getElementById('fechaCruce');
+    const today = fechaInput && fechaInput.value
+      ? fechaInput.value                          // fecha manual (días históricos)
+      : new Date().toISOString().slice(0,10);     // fecha de hoy por defecto
     let sinR033 = 0, conHistorico = 0;
     const YIELD_CADA = 500; // ceder al browser cada 500 ítems PTL
 
@@ -2542,7 +2604,33 @@ function goPage(p){
   document.querySelector('.table-wrap').scrollIntoView({behavior:'smooth',block:'start'});
 }
 
-// ── Event Listeners — Carga multi-archivo ─────────────────────
+// ── Selector de fecha del cruce ───────────────────────────────
+const fechaCruceInput = document.getElementById('fechaCruce');
+const btnFechaHoy     = document.getElementById('btnFechaHoy');
+
+// Inicializar con la fecha de hoy
+fechaCruceInput.value = new Date().toISOString().slice(0,10);
+
+// Botón "Hoy" → resetear a la fecha actual
+btnFechaHoy.addEventListener('click', ()=>{
+  fechaCruceInput.value = new Date().toISOString().slice(0,10);
+  fechaCruceInput.style.borderColor = '';
+  fechaCruceInput.style.background  = '';
+});
+
+// Resaltar visualmente cuando se selecciona una fecha diferente a hoy
+fechaCruceInput.addEventListener('change', ()=>{
+  const hoy = new Date().toISOString().slice(0,10);
+  if(fechaCruceInput.value && fechaCruceInput.value !== hoy){
+    fechaCruceInput.style.borderColor = 'var(--orange)';
+    fechaCruceInput.style.background  = 'var(--orange-bg)';
+    showStatus(`⚠️ Fecha manual seleccionada: <strong>${fechaCruceInput.value}</strong> — el cruce se guardará con esta fecha en el histórico.`);
+    document.getElementById('uploadStatus').style.display = '';
+  } else {
+    fechaCruceInput.style.borderColor = '';
+    fechaCruceInput.style.background  = '';
+  }
+});
 const dropZone  = document.getElementById('dropZone');
 const fileInput = document.getElementById('fileInput');
 
@@ -2631,6 +2719,9 @@ document.getElementById('btnClearCache').addEventListener('click', ()=>{
   if(cl) cl.style.display = 'none';
   const btnCruzar = document.getElementById('btnCruzar');
   if(btnCruzar){ btnCruzar.textContent = '⚙️ Cruzar y generar dashboard'; btnCruzar.style.background = ''; }
+  // Resetear fecha a hoy
+  const fi = document.getElementById('fechaCruce');
+  if(fi){ fi.value = new Date().toISOString().slice(0,10); fi.style.borderColor=''; fi.style.background=''; }
   document.getElementById('exportSnapshotBtn').style.display = 'none';
   document.getElementById('statsGrid').style.display = 'none';
   document.getElementById('chartSection').style.display = 'none';
